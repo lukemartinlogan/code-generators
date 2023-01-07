@@ -34,3 +34,6 @@ def parse_comments():
     assert(parser.get_root_node().children_[0].val == ' hello1 ')
     assert(parser.get_root_node().children_[1].val == ' hello2')
     assert(parser.get_root_node().children_[2].val == '123')
+
+
+parse_strings()

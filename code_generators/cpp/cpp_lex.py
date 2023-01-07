@@ -12,12 +12,8 @@ class CppLex:
         self.toks = None
 
     def lex(self):
-        for path in self.paths:
-            with open(path) as fp:
-                text = fp.read()
-                self._parse_text(text)
-        if self.text is not None:
-            self._parse_text(self.text)
+        self._split_cpp_toks(self.text)
+        return self
 
     @staticmethod
     def _clean(toks):

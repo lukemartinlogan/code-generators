@@ -13,10 +13,11 @@ class CppParse1:
         self.root_node = None
         self.cur_node = None
 
-    def _parse_text(self):
+    def parse(self):
         self.root_node = CppParseNode()
         self.cur_node = self.root_node
         self._parse_toks(self.lex.toks)
+        return self
 
     def _parse_toks(self, toks, i=0, term=None):
         while i < len(toks):
@@ -39,16 +40,18 @@ class CppParse1:
                 i = self._parse_parens(toks, i)
             elif tok == '[':
                 i = self._parse_bracket(toks, i)
-            elif tok == '<':
-                i = self._parse_angle_bracket(toks, i)
             elif tok == '{':
                 i = self._parse_brace(toks, i)
+            elif tok == '<' or tok == '>':
+                i = self._parse_angle_bracket(toks, i)
             elif tok == ':':
                 i = self._parse_colon(toks, i)
+            elif tok == ';':
+                i = self._parse_semicolon(toks, i)
             elif self._is_op(toks, i):
                 i = self._parse_op(toks, i)
             else:
-                i = self._parse_name(toks, i)
+                i = self._parse_text(toks, i)
 
     def _parse_ml_comment(self, toks, i):
         """
@@ -183,7 +186,7 @@ class CppParse1:
         """
         Group everything between starter and terminator recursively.
         """
-        self.cur_node.add_child(CppParseNodeType.PARENS)
+        self.cur_node.add_child(node_type)
         self.cur_node = self.cur_node.prior_child()
         next_start = self._parse_toks(toks, i + 1, term=term)
         self.cur_node = self.cur_node.parent
@@ -199,20 +202,50 @@ class CppParse1:
         return self._parse_grouping(toks, i, '}', CppParseNodeType.BRACES)
 
     def _parse_angle_bracket(self, toks, i):
-        pass
+        if toks[i] == '<':
+            self.cur_node.add_child(CppParseNodeType.ANGLE_BRACKET_LEFT)
+        else:
+            self.cur_node.add_child(CppParseNodeType.ANGLE_BRACKET_RIGHT)
+        self.cur_node.val = toks[i]
+        return i + 1
 
     def _parse_colon(self, toks, i):
-        """
-        Could be initializer list, namespace separator, iterator, or
-        inheritance
-        """
+        self.cur_node.add_child(CppParseNodeType.COLON)
+        self.cur_node.val = toks[i]
+        return i + 1
+
+    def _parse_semicolon(self, toks, i):
+        self.cur_node.add_child(CppParseNodeType.SEMICOLON)
+        self.cur_node.val = toks[i]
         return i + 1
 
     def _is_op(self, toks, i):
+        if toks[i] == '+':
+            return True
+        if toks[i] == '-':
+            return True
+        if toks[i] == '*':
+            return True
+        if toks[i] == '/':
+            return True
+        if toks[i] == '<':
+            return True
+        if toks[i] == '>':
+            return True
+        if toks[i] == '=':
+            return True
+        if toks[i] == '?':
+            return True
+        if toks[i] == '%':
+            return True
         return False
 
     def _parse_op(self, toks, i):
+        self.cur_node.add_child(CppParseNodeType.OP)
+        self.cur_node.val = toks[i]
         return i + 1
 
-    def _parse_name(self, toks, i):
+    def _parse_text(self, toks, i):
+        self.cur_node.add_child(CppParseNodeType.TEXT)
+        self.cur_node.val = toks[i]
         return i + 1
