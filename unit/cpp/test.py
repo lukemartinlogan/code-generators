@@ -35,21 +35,77 @@ def parse_comments():
     assert(parser.get_root_node().children_[1].val == ' hello2')
     assert(parser.get_root_node().children_[2].val == '123')
 
-def parse_groupings():
+def parse_function():
     text = """
     void hello(int x1 = 25, int y2 = 100);
-    
-    void hello2() {
-        int x = 25;
-        [x] (int y, int z) {
-            return x * y + z;
-        }
-    }
     """
 
     parser = CppParse(text=text)
     parser.parse()
+
+    print(text)
+    print()
+    parser.get_root_node().print()
+
+def parse_lambda():
+    text = """
+    [] () {}
+    [x,y] (int y, int z) { y + z; }
+    """
+
+    parser = CppParse(text=text)
+    parser.parse()
+
+    print(text)
+    print()
+    parser.get_root_node().print()
+
+def parse_template():
+    text = """
+    template<typename T>
+    
+    template<typename T, typename Y = X<T>,
+             class Z = std::conditional<true, T, Y>>
+    """
+
+    parser = CppParse(text=text)
+    parser.parse()
+
+    print(text)
+    print()
     parser.get_root_node().print()
 
 
-parse_groupings()
+def parse_class():
+    text = """
+    class y : public z {}
+    """
+
+    parser = CppParse(text=text)
+    parser.parse()
+
+    print(text)
+    print()
+    parser.get_root_node().print()
+
+def parse_templated_class():
+    text = """
+    template<typename T>
+    class y : public z {
+     public:
+     
+      /** This is a docstring */
+      template<typename T, typename Y>
+      void x(25); 
+    };
+    """
+
+    parser = CppParse(text=text)
+    parser.parse()
+
+    print(text)
+    print()
+    parser.get_root_node().print()
+
+
+parse_templated_class()

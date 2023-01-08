@@ -1,5 +1,7 @@
 from .cpp_lex import CppLex
 from .cpp_parse1 import CppParse1
+from .cpp_parse2 import CppParse2
+from .cpp_parse3 import CppParse3
 
 
 class CppParse:
@@ -19,7 +21,9 @@ class CppParse:
     def _parse_text(self, text):
         lex = CppLex(text).lex()
         phase1 = CppParse1(lex).parse()
-        self.parse_tree = phase1
+        phase2 = CppParse2(phase1).parse()
+        phase3 = CppParse3(phase2).parse()
+        self.parse_tree = phase3
 
     def get_root_node(self):
-        return self.parse_tree.root_node
+        return self.parse_tree.get_root_node()
