@@ -1,6 +1,9 @@
 """
-Tokenizes a C/C++ file and parses using only basic syntax. It is used to
-infer the true nature of the file for simple code generation.
+Gets the initial structure of a C++ text. Identifies:
+1. Preprocessor macros
+2. Strings/characters
+3. Non-angle Groupings (e.g., braces, brackets, parenthesis)
+4. Some binary/unary operations
 """
 
 import re
@@ -211,12 +214,16 @@ class CppParse1:
 
     def _parse_colon(self, toks, i):
         self.cur_node.add_child(CppParseNodeType.COLON)
+        self.cur_node = self.cur_node.prior_child()
         self.cur_node.val = toks[i]
+        self.cur_node = self.cur_node.parent
         return i + 1
 
     def _parse_semicolon(self, toks, i):
         self.cur_node.add_child(CppParseNodeType.SEMICOLON)
+        self.cur_node = self.cur_node.prior_child()
         self.cur_node.val = toks[i]
+        self.cur_node = self.cur_node.parent
         return i + 1
 
     def _is_op(self, toks, i):
@@ -242,10 +249,14 @@ class CppParse1:
 
     def _parse_op(self, toks, i):
         self.cur_node.add_child(CppParseNodeType.OP)
+        self.cur_node = self.cur_node.prior_child()
         self.cur_node.val = toks[i]
+        self.cur_node = self.cur_node.parent
         return i + 1
 
     def _parse_text(self, toks, i):
         self.cur_node.add_child(CppParseNodeType.TEXT)
+        self.cur_node = self.cur_node.prior_child()
         self.cur_node.val = toks[i]
+        self.cur_node = self.cur_node.parent
         return i + 1

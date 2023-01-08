@@ -21,6 +21,7 @@ class CppParseNodeType(Enum):
     ANGLE_BRACKET_RIGHT = "ANGLE_BRACKET_RIGHT"
     COMMA = "COMMA"
     COLON = "COLON"
+    SEMICOLON = "SEMICOLON"
 
     UNKOWN = "UNKOWN"
 

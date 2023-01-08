@@ -35,5 +35,21 @@ def parse_comments():
     assert(parser.get_root_node().children_[1].val == ' hello2')
     assert(parser.get_root_node().children_[2].val == '123')
 
+def parse_groupings():
+    text = """
+    void hello(int x1 = 25, int y2 = 100);
+    
+    void hello2() {
+        int x = 25;
+        [x] (int y, int z) {
+            return x * y + z;
+        }
+    }
+    """
 
-parse_strings()
+    parser = CppParse(text=text)
+    parser.parse()
+    parser.get_root_node().print()
+
+
+parse_groupings()
