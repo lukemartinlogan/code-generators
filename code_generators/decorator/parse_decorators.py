@@ -26,6 +26,8 @@ class ParseDecorators:
                 self._parse_decorators(node, state)
             elif node.node_type == CppParseNodeType.NAMESPACE_DEFN:
                 self._parse_decorators(node, state)
+            elif node.node_type == CppParseNodeType.BODY:
+                self._parse_decorators(node, state)
             i += 1
 
     def _parse_function(self, func_node, state):
@@ -39,6 +41,6 @@ class ParseDecorators:
                 return
 
     def _output(self, state):
-        for path, lines in state:
+        for path, lines in state.items():
             with open(path, 'w') as fp:
-                fp.write(lines.join("\n"))
+                fp.write("\n".join(lines))
