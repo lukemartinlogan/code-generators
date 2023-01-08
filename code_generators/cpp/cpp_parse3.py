@@ -1,9 +1,9 @@
 """
-Gets the initial structure of a C++ text. Identifies:
-1. Functions / lambdas defintions (untemplated)
-2. Template argument lists
-3. Class/struct definitions
-4. Namespace declarations
+Identifies:
+1. Templated functions + classes
+2. Properties of a function (e.g., name and specifier)
+3. Properties of a class (e.g., name)
+4. Properties of a namespace (e.g., name)
 
 This parsing is not perfect, as we do not go into the complexity of type
 checking and preprocessing. This makes some assumptions about the style of the
@@ -26,18 +26,77 @@ class CppParse3:
         i = 0
         while i < root_node.size():
             node = root_node[i]
+            if node.node_type == CppParseNodeType.FUNCTION:
+                self._parse_function_defn(node)
+
             if node.node_type == CppParseNodeType.TEMPLATE_KEYWORD:
                 ret = self._parse_template_defn(root_node, i)
                 if ret > 0:
                     i = ret
                     continue
-            if node.node_type == CppParseNodeType.CLASS_DEFN:
+            elif node.node_type == CppParseNodeType.CLASS_DEFN:
+                self._parse_class(node)
                 self._reparse(node)
             elif node.node_type == CppParseNodeType.NAMESPACE_DEFN:
+                self._parse_namespace(node)
                 self._reparse(node)
             elif node.node_type == CppParseNodeType.BODY:
                 self._reparse(node)
             i += 1
+
+    def _parse_function_defn(self, func_node):
+        """
+        Determines properties of a function
+        (e.g., function type, name, specifiers)
+
+        [COMMENT] [SPECIFIERS] [FUNC_TYPE] [FUNC_NAME] [FUNC_PARAMS]
+        """
+
+        # Determine the index of the function params
+        i = 0
+        while i < func_node.size():
+            node = func_node[i]
+            if node.node_type == CppParseNodeType.PARAMS:
+                break
+            i += 1
+
+        # Return if this is simply a function call
+        if i < 2:
+            node.node_type = CppParseNodeType.FUNCTION_CALL
+            return
+
+        # Get the function name
+        func_node.name = func_node[i - 1].val
+
+        # Get the function type
+        func_node.type = func_node[i - 2].val
+
+        # Get the function specifiers
+        func_node.specifiers = []
+        for spec in func_node.get_children()[:i-2]:
+            if spec.node_type == CppParseNodeType.SPECIFIER_KEYWORD:
+                func_node.specifiers.append(spec.val)
+            elif spec.node_type == CppParseNodeType.TEXT:
+                func_node.specifiers.append(spec.val)
+
+        # Get the function docstring
+        func_node.docstring = ""
+        for node in func_node.get_children():
+            if node.node_type == CppParseNodeType.COMMENT:
+                func_node.docstring = node.val
+                break
+
+    def _parse_class(self, class_node):
+        """
+        Determines other properties of a class
+        """
+        class_node.name = class_node[0].val
+
+    def _parse_namespace(self, ns_node):
+        """
+        Determines other properties of a namespace
+        """
+        ns_node.name = ns_node[0].val
 
     def _parse_template_defn(self, root_node, i):
         """

@@ -45,7 +45,7 @@ def parse_function():
 
     print(text)
     print()
-    parser.get_root_node().print()
+    parser.print()
 
 def parse_lambda():
     text = """
@@ -58,7 +58,7 @@ def parse_lambda():
 
     print(text)
     print()
-    parser.get_root_node().print()
+    parser.print()
 
 def parse_template():
     text = """
@@ -73,7 +73,7 @@ def parse_template():
 
     print(text)
     print()
-    parser.get_root_node().print()
+    parser.print()
 
 
 def parse_class():
@@ -86,7 +86,7 @@ def parse_class():
 
     print(text)
     print()
-    parser.get_root_node().print()
+    parser.print()
 
 def parse_templated_class():
     text = """
@@ -105,7 +105,7 @@ def parse_templated_class():
 
     print(text)
     print()
-    parser.get_root_node().print()
+    parser.print()
 
 
 parse_templated_class()

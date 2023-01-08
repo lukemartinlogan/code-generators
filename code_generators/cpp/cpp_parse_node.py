@@ -13,8 +13,6 @@ class CppParseNodeType(Enum):
     PARENS = "PARENS"
     ANGLE_BRACKETS = "ANGLE_BRACKETS"
     BRACES = "BRACES"
-    FUNCTION = "FUNCTION"
-    LAMBDA = "LAMBDA"
     PREPROCESSOR = "PREPROCESSOR"
 
     # Phase 1 parsing
@@ -34,6 +32,8 @@ class CppParseNodeType(Enum):
     SEMICOLON = "SEMICOLON"
 
     # Phase 2 parsing
+    FUNCTION = "FUNCTION"
+    LAMBDA = "LAMBDA"
     CLASS_DEFN = "CLASS_DEFN"
     INHERITANCE = "INHERITANCE"
     NAMESPACE_DEFN = "NAMESPACE_DEFN"
@@ -43,6 +43,9 @@ class CppParseNodeType(Enum):
     PARAMS = "PARAMS"
     PARAM = "PARAM"
     BODY = "BODY"
+
+    # Phase 3 parsing
+    FUNCTION_CALL = "FUNCTION_CALL"
 
     # Unkown
     UNKOWN = "UNKOWN"

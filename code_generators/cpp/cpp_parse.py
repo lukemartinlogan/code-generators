@@ -27,3 +27,6 @@ class CppParse:
 
     def get_root_node(self):
         return self.parse_tree.get_root_node()
+
+    def print(self):
+        self.get_root_node().print()

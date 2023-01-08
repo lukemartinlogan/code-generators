@@ -1,5 +1,5 @@
 """
-Gets the initial structure of a C++ text. Identifies:
+Identifies:
 1. Functions / lambdas defintions (untemplated)
 2. Template argument lists
 3. Class/struct definitions
@@ -147,13 +147,16 @@ class CppParse2:
         if ret < 0:
             return -1
         i = ret
+        if i >= root_node.size():
+            return -1
 
         # Next node is possilby the namespace body
         node = root_node[i]
-        if node.node_type == CppParseNodeType.BRACES:
-            node.node_type = CppParseNodeType.BODY
-            self._reparse(node)
-            i += 1
+        if node.node_type != CppParseNodeType.BRACES:
+            return -1
+        node.node_type = CppParseNodeType.BODY
+        self._reparse(node)
+        i += 1
 
         # Update the root node
         ns_def_node = CppParseNode(node_type=CppParseNodeType.NAMESPACE_DEFN,
@@ -175,13 +178,16 @@ class CppParse2:
             node = root_node[i]
             next_node = None
             if i + 1 < root_node.size():
-                next_node = root_node.next
+                next_node = root_node[i+1]
             if node.node_type == CppParseNodeType.TEXT:
                 ns_node.add_child_node(node)
             elif node.node_type == CppParseNodeType.COLON and \
                     next_node is not None and \
                     next_node.node_type == CppParseNodeType.COLON:
                 ns_node.add_child_node(node)
+                ns_node.add_child_node(next_node)
+                i += 2
+                continue
             else:
                 break
             i += 1
