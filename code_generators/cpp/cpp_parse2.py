@@ -192,7 +192,7 @@ class CppParse2:
                 break
             i += 1
         ns_node.join()
-        root_node.replace_children(ns_node, i0, i)
+        root_node.replace_children(ns_node, i0, i - 1)
         return i0 + 1
 
     def _parse_function(self, root_node, i):

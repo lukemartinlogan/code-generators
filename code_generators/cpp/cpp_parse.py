@@ -23,7 +23,7 @@ class CppParse:
         phase1 = CppParse1(lex).parse()
         phase2 = CppParse2(phase1).parse()
         phase3 = CppParse3(phase2).parse()
-        self.parse_tree = phase3
+        self.parse_tree = phase1
 
     def get_root_node(self):
         return self.parse_tree.get_root_node()

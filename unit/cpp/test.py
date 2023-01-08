@@ -107,5 +107,23 @@ def parse_templated_class():
     print()
     parser.print()
 
+def parse_namespace():
+    text = """
+    namespace hello {
 
-parse_templated_class()
+    class test {
+     public:
+      TEST void LocalHi(int x, int y);
+      TEST void LocalLo(std::vector<int> y);
+    
+      #include "_test.h"
+    };
+    
+    }  // namespace hello
+    """
+
+    parser = CppParse(text=text)
+    parser.parse()
+    parser.print()
+
+parse_namespace()
