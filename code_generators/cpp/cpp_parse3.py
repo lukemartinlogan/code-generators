@@ -19,14 +19,14 @@ class CppParse3:
         self.parse_tree = parse_tree
 
     def parse(self):
-        self._reparse(self.parse_tree.get_root_node())
+        self._reparse(self.get_root_node())
         return self
 
     def _reparse(self, root_node):
         i = 0
         while i < root_node.size():
             node = root_node[i]
-            if node.node_type == CppParseNodeType.FUNCTION:
+            if node.node_type == CppParseNodeType.FUNCTION_DEF:
                 self._parse_function_defn(node)
 
             if node.node_type == CppParseNodeType.TEMPLATE_KEYWORD:
@@ -49,7 +49,7 @@ class CppParse3:
         Determines properties of a function
         (e.g., function type, name, specifiers)
 
-        [COMMENT] [SPECIFIERS] [FUNC_TYPE] [FUNC_NAME] [FUNC_PARAMS]
+        [SPECIFIERS] [FUNC_TYPE] [FUNC_NAME] [FUNC_PARAMS]
         """
 
         # Determine the index of the function params
@@ -74,7 +74,7 @@ class CppParse3:
         # Get the function specifiers
         func_node.specifiers = []
         for spec in func_node.get_children()[:i-2]:
-            if spec.node_type == CppParseNodeType.SPECIFIER_KEYWORD:
+            if spec.node_type == CppParseNodeType.KEYWORD:
                 func_node.specifiers.append(spec.val)
             elif spec.node_type == CppParseNodeType.TEXT:
                 func_node.specifiers.append(spec.val)
@@ -82,7 +82,8 @@ class CppParse3:
         # Get the function docstring
         func_node.docstring = ""
         for node in func_node.get_children():
-            if node.node_type == CppParseNodeType.COMMENT:
+            if node.is_one_of(CppParseNodeType.ML_COMMENT,
+                            CppParseNodeType.SL_COMMENT):
                 func_node.docstring = node.val
                 break
 
@@ -101,10 +102,10 @@ class CppParse3:
     def _parse_template_defn(self, root_node, i):
         """
         Converts:
-        [COMMENT] [template] [TEMPLATE_PARAMS] [FUNCTION]
+        [COMMENT] [template] [TEMPLATE_PARAMS] [FUNCTION_DEF]
         [COMMENT] [template] [TEMPLATE_PARAMS] [CLASS_DEFN]
         Into:
-        [FUNCTION] OR
+        [FUNCTION_DEF] OR
         [CLASS_DEFN]
 
         i: the index of the "template" keyword"
@@ -121,7 +122,8 @@ class CppParse3:
         # Prior node might be "comment"
         if i0 > 0:
             node = root_node[i0 - 1]
-            if node.node_type == CppParseNodeType.COMMENT:
+            if node.is_one_of(CppParseNodeType.ML_COMMENT,
+                            CppParseNodeType.SL_COMMENT):
                 i0 -= 1
 
         # Next node must be TEMPLATE_PARAMS
@@ -131,9 +133,9 @@ class CppParse3:
         tparams_i = i
         i += 1
 
-        # Next node must be FUNCTION
+        # Next node must be FUNCTION_DEF
         node = root_node[i]
-        if node.node_type == CppParseNodeType.FUNCTION:
+        if node.node_type == CppParseNodeType.FUNCTION_DEF:
             pass
         elif node.node_type == CppParseNodeType.CLASS_DEFN:
             pass
@@ -142,10 +144,13 @@ class CppParse3:
         i += 1
         func_node = node
 
-        # Update FUNCTION node
+        # Update FUNCTION_DEF node
         func_node.add_child_nodes(root_node, i0, tparams_i)
         root_node.replace_children(func_node, i0, i)
         return i0 + 1
 
     def get_root_node(self):
         return self.parse_tree.get_root_node()
+
+    def get_style_nodes(self):
+        return self.parse_tree.get_style_nodes()

@@ -11,13 +11,52 @@ from .cpp_parse_node import CppParseNode, CppParseNodeType
 
 
 class CppParse1:
-    def __init__(self, lex=None):
+    def __init__(self, lex=None, ignore_comments=False, ignore_whitespace=False):
         self.lex = lex
         self.root_node = None
+        self.style_nodes = None
         self.cur_node = None
+        self.ignore_comments = ignore_comments
+        self.ignore_whitespace = ignore_whitespace
+
+        #CPP keywords
+        self.cpp0 = ['and', 'and_eq', 'asm', 'atomic_cancel', 'atomic_commit',
+                     'atomic_noexcept', 'auto', 'bitand', 'bitor', 'bool',
+                     'break', 'case', 'catch', 'char', 'class', 'compl',
+                     'const', 'const_cast', 'continue', 'default', 'delete',
+                     'do', 'double', 'dynamic_cast', 'else', 'enum', 'explicit',
+                     'export', 'extern', 'false', 'float', 'for', 'friend',
+                     'goto', 'if', 'inline', 'int', 'long', 'mutable',
+                     'namespace', 'new', 'not', 'not_eq', 'operator', 'or',
+                     'or_eq', 'private', 'protected', 'public', 'reflexpr',
+                     'register', 'reinterpret_cast', 'return', 'short',
+                     'signed', 'sizeof', 'static', 'static_cast', 'struct',
+                     'switch', 'synchronized', 'template', 'this', 'throw',
+                     'true', 'try', 'typedef', 'typeid', 'typename', 'union',
+                     'unsigned', 'using', 'virtual', 'void', 'volatile',
+                     'wchar_t', 'while', 'xor', 'xor_eq']
+        self.cpp11 = self.cpp0 + ['alignas', 'alignof', 'char16_t', 'char32_t',
+                                  'constexpr', 'decltype', 'noexcept',
+                                  'nullptr', 'static_assert', 'thread_local']
+        self.cpp17 = self.cpp11 + []
+        self.cpp20 = self.cpp17 + ['char8_t', 'concept', 'consteval',
+                                   'constinit', 'co_await', 'co_return',
+                                   'co_yield', 'requires']
+        self.cpp23 = self.cpp20 + []
+        self.keywords = self.cpp23
+
+        # CPP Type Keywords
+        self.type_keywords0 = ['bool', 'char', 'double',  'float', 'int',
+                               'void', 'wchar_t']
+        self.type_keywords11 = self.type_keywords0 + ['char16_t', 'char32_t']
+        self.type_keywords17 =  self.type_keywords11 + []
+        self.type_keywords20 = self.type_keywords17 + ['char8_t']
+        self.type_keywords23 = self.type_keywords20 + []
+        self.type_keywords = self.type_keywords23
 
     def parse(self):
         self.root_node = CppParseNode()
+        self.style_nodes = CppParseNode()
         self.cur_node = self.root_node
         self._parse_toks(self.lex.toks)
         return self
@@ -66,17 +105,21 @@ class CppParse1:
 
         i: the index of the starting / of the /*
         """
+        i0 = i
         i += 2
-        self.cur_node.add_child(CppParseNodeType.COMMENT)
-        self.cur_node = self.cur_node.prior_child()
+        style_node = CppParseNode(CppParseNodeType.ML_COMMENT)
+        style_node.make_tok_child(CppParseNodeType.TEXT,
+                                  "/*", i0, hidden=True)
         while i < len(toks) - 1:
             tok1 = toks[i]
             tok2 = toks[i+1]
             if tok1 == '*' and tok2 == '/':
-                self.cur_node.join()
-                self.cur_node = self.cur_node.parent
+                style_node.make_tok_child(CppParseNodeType.TEXT,
+                                          "*/", i, hidden=True)
+                style_node.join()
+                self.style_nodes.add_child_node(style_node)
                 return i + 2
-            self.cur_node.add_child(CppParseNodeType.TEXT, tok1)
+            style_node.make_tok_child(CppParseNodeType.TEXT, tok1, i)
             i += 1
         raise Exception("Couldn't find the end */ of the multi-line comment")
 
@@ -86,17 +129,21 @@ class CppParse1:
 
         i: the index of the starting / of the //
         """
+        i0 = i
         i += 2
-        self.cur_node.add_child(CppParseNodeType.COMMENT)
-        self.cur_node = self.cur_node.prior_child()
+        style_node = CppParseNode(CppParseNodeType.SL_COMMENT)
+        style_node.make_tok_child(CppParseNodeType.TEXT,
+                                  "//", i0, hidden=True)
         while i < len(toks):
             tok = toks[i]
             if '\n' in tok:
+                style_node.make_tok_child(CppParseNodeType.TEXT, tok,
+                                          i, hidden=True)
                 break
-            self.cur_node.add_child(CppParseNodeType.TEXT, tok)
+            style_node.make_tok_child(CppParseNodeType.TEXT, tok, i)
             i += 1
-        self.cur_node.join()
-        self.cur_node = self.cur_node.parent
+        style_node.join()
+        self.style_nodes.add_child_node(style_node)
         return i + 1
 
     @staticmethod
@@ -131,8 +178,10 @@ class CppParse1:
         return re.match('\s+', toks[i])
 
     def _parse_whitespace(self, toks, i):
-        del toks[i]
-        return i
+        style_node = CppParseNode(CppParseNodeType.TEXT,
+                                  toks[i], i, hidden=True)
+        self.style_nodes.add_child_node(style_node)
+        return i + 1
 
     def _parse_string(self, toks, i):
         """
@@ -141,51 +190,82 @@ class CppParse1:
         :param i: the index of the \" token
         :return: the index of the token after the string ends
         """
+        i0 = i
         i += 1
-        self.cur_node.add_child(CppParseNodeType.STRING)
-        self.cur_node = self.cur_node.prior_child()
+        style_node = CppParseNode(CppParseNodeType.TEXT, hidden=True)
+        style_node.make_tok_child(CppParseNodeType.TEXT,
+                                  toks[i0], i0, hidden=True)
+        string_node = CppParseNode(CppParseNodeType.STRING)
         while i < len(toks):
             if self._is_string(toks, i):
-                self.cur_node.join()
-                self.cur_node = self.cur_node.parent
+                style_node.make_tok_child(CppParseNodeType.TEXT, toks[i],
+                                          i, hidden=True)
+                string_node.join()
+                self.style_nodes.add_child_node(style_node)
+                self.cur_node.add_child_node(string_node)
                 return i + 1
             if self._is_multiline_sep(toks, i):
-                del toks[i]
+                style_node.make_tok_child(CppParseNodeType.TEXT, toks[i],
+                                          i, hidden=True)
+                i += 1
                 continue
-            self.cur_node.add_child(CppParseNodeType.TEXT, toks[i])
+            string_node.make_tok_child(CppParseNodeType.TEXT, toks[i], i)
             i += 1
         raise Exception("Could not find end of string")
 
     def _parse_char(self, toks, i):
         """
-        Parse to the end of a C++ string.
+        Parse to the end of a C++ char.
 
         :param i: the index of the \' token
         :return: the index of the token after the char ends
         """
+        i0 = i
         i += 1
-        self.cur_node.add_child(CppParseNodeType.CHAR)
-        self.cur_node = self.cur_node.prior_child()
+        style_node = CppParseNode(CppParseNodeType.TEXT, hidden=True)
+        style_node.make_tok_child(CppParseNodeType.TEXT,
+                                  toks[i0], i, hidden=True)
+        char_node = CppParseNode(CppParseNodeType.CHAR)
         while i < len(toks):
             if self._is_char(toks, i):
-                self.cur_node.join()
-                self.cur_node = self.cur_node.parent
+                style_node.make_tok_child(CppParseNodeType.TEXT, toks[i],
+                                          i, hidden=True)
+                char_node.join()
+                self.style_nodes.add_child_node(style_node)
+                self.cur_node.add_child_node(char_node)
                 return i + 1
-            self.cur_node.add_child(CppParseNodeType.TEXT, toks[i])
+            char_node.make_tok_child(CppParseNodeType.TEXT, toks[i], i)
             i += 1
         raise Exception("Could not find end of char")
 
     def _parse_preprocessor(self, toks, i):
+        """
+        Parse a C macro definition
+        #[TEXT] [TEXT]\[TEXT]...
+
+        :param toks:
+        :param i:
+        :return:
+        """
+
+        i0 = i
         i += 1
-        self.cur_node.add_child(CppParseNodeType.PREPROCESSOR)
-        self.cur_node = self.cur_node.prior_child()
+
+        style_node = CppParseNode(CppParseNodeType.TEXT)
+        preprocess_node = CppParseNode(CppParseNodeType.PREPROCESSOR)
+        preprocess_node.make_tok_child(CppParseNodeType.TEXT,
+                                       f"#{toks[i]}", i0)
+        i += 1
         while i < len(toks):
             if '\n' in toks[i]:
-                if self._is_multiline_sep(toks, i+1):
-                    self.cur_node.join()
-                    self.cur_node = self.cur_node.parent
+                if not self._is_multiline_sep(toks, i+1):
+                    style_node.make_tok_child(CppParseNodeType.TEXT,
+                                              toks[i], i, hidden=True)
+                    preprocess_node.join()
+                    self.style_nodes.add_child_node(preprocess_node)
+                    self.cur_node.add_child_node(preprocess_node)
                     break
-                break
+            preprocess_node.make_tok_child(CppParseNodeType.TEXT, toks[i], i)
             i += 1
         return i + 1
 
@@ -193,11 +273,21 @@ class CppParse1:
         """
         Group everything between starter and terminator recursively.
         """
-        self.cur_node.add_child(node_type)
-        self.cur_node = self.cur_node.prior_child()
-        next_start = self._parse_toks(toks, i + 1, term=term)
-        self.cur_node = self.cur_node.parent
-        return next_start
+        style_node = CppParseNode(CppParseNodeType.TEXT)
+        group_node = CppParseNode(node_type)
+
+        old_cur_node = self.cur_node
+        self.cur_node = group_node
+        style_node.make_tok_child(CppParseNodeType.TEXT,
+                                  toks[i], i, hidden=True)
+        i = self._parse_toks(toks, i + 1, term=term)
+        style_node.make_tok_child(CppParseNodeType.TEXT,
+                                  term, i - 1, hidden=True)
+
+        self.cur_node = old_cur_node
+        self.style_nodes.add_child_node(style_node)
+        self.cur_node.add_child_node(group_node)
+        return i
 
     def _parse_parens(self, toks, i):
         return self._parse_grouping(toks, i, ')', CppParseNodeType.PARENS)
@@ -210,10 +300,12 @@ class CppParse1:
 
     def _parse_angle_bracket(self, toks, i):
         if toks[i] == '<':
-            self.cur_node.add_child(CppParseNodeType.ANGLE_BRACKET_LEFT)
+            bracket_node = CppParseNode(CppParseNodeType.ANGLE_BRACKET_LEFT,
+                                        toks[i], i)
         else:
-            self.cur_node.add_child(CppParseNodeType.ANGLE_BRACKET_RIGHT)
-        self.cur_node.val = toks[i]
+            bracket_node = CppParseNode(CppParseNodeType.ANGLE_BRACKET_RIGHT,
+                                        toks[i], i)
+        self.cur_node.add_child_node(bracket_node)
         return i + 1
 
     def _parse_comma(self, toks, i):
@@ -247,42 +339,61 @@ class CppParse1:
         return False
 
     def _parse_op(self, toks, i):
+        # Arithmetic operators
+        if self._toks_match(toks, i, '+', '+'):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '-', '-'):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '+', '='):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '-', '='):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '*', '='):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '/', '='):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '%', '='):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+
+        # Relational operators
+        elif self._toks_match(toks, i, '=', '='):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '!', '='):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '<', '='):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '>', '='):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+
+        # Bitwise operators
+        elif self._toks_match(toks, i, '&', '='):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '|', '='):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '^', '='):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '<', '<'):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '>', '>'):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '<', '<', '='):
+            self.parse_multi_tok(toks, i, 3, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '>', '>', '='):
+            self.parse_multi_tok(toks, i, 3, CppParseNodeType.OP)
+
+        # Logical operators
+        elif self._toks_match(toks, i, '&', '&'):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+        elif self._toks_match(toks, i, '|', '|'):
+            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
+
         return self._parse_single_tok(toks, i, CppParseNodeType.OP)
 
     def _parse_text(self, toks, i):
         return self._parse_single_tok(toks, i, CppParseNodeType.TEXT)
 
     def _is_keyword(self, tok):
-        if tok == 'class':
-            return True
-        elif tok == 'struct':
-            return True
-        elif tok == 'public':
-            return True
-        elif tok == 'private':
-            return True
-        elif tok == 'protected':
-            return True
-        elif tok == 'namespace':
-            return True
-        elif tok == 'template':
-            return True
-        elif tok == 'int':
-            return True
-        elif tok == 'float':
-            return True
-        elif tok == 'double':
-            return True
-        elif tok == 'const':
-            return True
-        elif tok == 'constexpr':
-            return True
-        elif tok == 'inline':
-            return True
-        elif tok == 'static':
-            return True
-        else:
-            return False
+        return tok in self.keywords
 
     def _parse_keyword(self, toks, i):
         tok = toks[i]
@@ -290,41 +401,40 @@ class CppParse1:
             self._parse_single_tok(toks, i, CppParseNodeType.CLASS_KEYWORD)
         elif tok == 'struct':
             self._parse_single_tok(toks, i, CppParseNodeType.STRUCT_KEYWORD)
-        elif tok == 'public':
-            self._parse_single_tok(toks, i, CppParseNodeType.SPECIFIER_KEYWORD)
-        elif tok == 'private':
-            self._parse_single_tok(toks, i, CppParseNodeType.SPECIFIER_KEYWORD)
-        elif tok == 'protected':
-            self._parse_single_tok(toks, i, CppParseNodeType.SPECIFIER_KEYWORD)
         elif tok == 'namespace':
             self._parse_single_tok(toks, i, CppParseNodeType.NAMESPACE_KEYWORD)
         elif tok == 'template':
             self._parse_single_tok(toks, i, CppParseNodeType.TEMPLATE_KEYWORD)
-        elif tok == 'int':
+        elif tok in self.type_keywords:
             self._parse_single_tok(toks, i,
-                                   CppParseNodeType.BUILTIN_TYPE_KEYWORD)
-        elif tok == 'float':
-            self._parse_single_tok(toks, i,
-                                   CppParseNodeType.BUILTIN_TYPE_KEYWORD)
-        elif tok == 'double':
-            self._parse_single_tok(toks, i,
-                                   CppParseNodeType.BUILTIN_TYPE_KEYWORD)
-        elif tok == 'const':
-            self._parse_single_tok(toks, i, CppParseNodeType.SPECIFIER_KEYWORD)
-        elif tok == 'constexpr':
-            self._parse_single_tok(toks, i, CppParseNodeType.SPECIFIER_KEYWORD)
-        elif tok == 'static':
-            self._parse_single_tok(toks, i, CppParseNodeType.SPECIFIER_KEYWORD)
-        elif tok == 'inline':
-            self._parse_single_tok(toks, i, CppParseNodeType.SPECIFIER_KEYWORD)
+                                   CppParseNodeType.TYPE)
+        else:
+            self._parse_single_tok(toks, i, CppParseNodeType.KEYWORD)
         return i + 1
 
     def _parse_single_tok(self, toks, i, node_type):
-        self.cur_node.add_child(node_type)
-        self.cur_node = self.cur_node.prior_child()
-        self.cur_node.val = toks[i]
-        self.cur_node = self.cur_node.parent
+        tok_node = CppParseNode(node_type, toks[i], i)
+        self.cur_node.add_child_node(tok_node)
         return i + 1
+
+    def parse_multi_tok(self, toks, i, count, node_type):
+        tok_node = CppParseNode(node_type)
+        for k in range(count):
+            tok_node.make_tok_child(CppParseNodeType.TEXT, toks[i+k], i+k)
+        self.cur_node.add_child_node(tok_node)
+        return i + count
 
     def get_root_node(self):
         return self.root_node
+
+    def get_style_nodes(self):
+        return self.style_nodes
+
+    def _toks_match(self, toks, i, *vals):
+        for val in vals:
+            if i >= len(toks):
+                return False
+            if toks[i] != val:
+                return False
+            i += 1
+        return True

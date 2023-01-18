@@ -27,19 +27,21 @@ class SingletonDefinition:
 
 
 class SingletonGenerator:
-    def __init__(self, guard_name, singleton_include,
-                 singleton_namespace, type, singleton_name="Singleton"):
+    def __init__(self, singleton_include,
+                 singleton_namespace,
+                 type, singleton_name="Singleton"):
         """
         Creates the shared-object for a singleton class
 
-        guard_name: header guard for singleton include file
         singleton_namespace: the namespace of the singleton
         singleton_include: location of singleton.hpp
         type: the type of singleton to generate
+        singleton_name: the name of the singleton class
         """
 
         self.singleton_include = singleton_include
-        self.guard_name = guard_name
+        self.guard_name = f"{singleton_namespace.replace('::', '_').upper()}"\
+                          f"_{singleton_name.upper()}_H_"
         self.type = type
         if singleton_namespace is not None:
             self.singleton = f"{singleton_namespace}::{singleton_name}"
@@ -67,21 +69,21 @@ class SingletonGenerator:
         lines.append(f"#include {self.singleton_include}")
         lines.append("")
         for defn in self.defs:
-            lines.append(f"#include <{defn.include}>")
+            lines.append(f"#include {defn.include}")
             if self.type == SingletonType.GLOBAL_VAR:
-                lines.append("template<>" 
-                             f"{defn.class_name}" 
-                             f"{self.singleton}<{defn.class_name}>::obj_ = "
-                             "nullptr;")
+                lines.append(
+                    "template<> " 
+                    f"{defn.class_name} " 
+                    f"{self.singleton}<{defn.class_name}>::obj_ = nullptr;")
             elif self.type == SingletonType.UNIQUE_PTR:
-                lines.append("template<>"
-                             f"std::unique_ptr<{defn.class_name}>"
-                             f"{self.singleton}<{defn.class_name}>::obj_ =" 
-                             "nullptr;")
+                lines.append(
+                    "template<> "
+                    f"std::unique_ptr<{defn.class_name}> "
+                    f"{self.singleton}<{defn.class_name}>::obj_ = nullptr;")
             elif self.type == SingletonType.SHARED_PTR:
                 lines.append(
-                    "template<>" 
-                    f"std::shared_ptr<{defn.class_name}>"
+                    "template<> " 
+                    f"std::shared_ptr<{defn.class_name}> "
                     f"{self.singleton}<{defn.class_name}>::obj_ = nullptr;")
         self._save_lines(lines, path)
 
@@ -93,7 +95,7 @@ class SingletonGenerator:
         lines.append(f"#include {self.singleton_include}")
         lines.append("")
         for defn in self.defs:
-            lines.append(f"#define {defn.macro_name}" 
+            lines.append(f"#define {defn.macro_name} " 
                          f"{self.singleton}<{defn.class_name}>::GetInstance()")
             lines.append(f"#define {defn.type_name} {defn.class_name}*")
             lines.append("")

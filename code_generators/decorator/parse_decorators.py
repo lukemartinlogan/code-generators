@@ -20,7 +20,7 @@ class ParseDecorators:
         i = 0
         while i < root_node.size():
             node = root_node[i]
-            if node.node_type == CppParseNodeType.FUNCTION:
+            if node.node_type == CppParseNodeType.FUNCTION_DEF:
                 self._parse_function(node, state)
             elif node.node_type == CppParseNodeType.CLASS_DEFN:
                 self._parse_decorators(node, state)

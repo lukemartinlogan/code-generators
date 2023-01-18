@@ -6,7 +6,7 @@ import re
 import sys, os
 
 
-class CppLex:
+class CppParse0:
     def __init__(self, text):
         self.text = text
         self.toks = None
@@ -27,5 +27,5 @@ class CppLex:
         chars = "".join(chars)
         chars = f"[{chars}]"
         toks = re.split(f"({chars}|\s+)", text)
-        toks = CppLex._clean(toks)
+        toks = CppParse0._clean(toks)
         self.toks = toks

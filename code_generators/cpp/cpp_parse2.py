@@ -1,6 +1,6 @@
 """
 Identifies:
-1. Functions / lambdas defintions (untemplated)
+1. Function / lambda calls/defintions (untemplated)
 2. Template argument lists
 3. Class/struct definitions
 4. Namespace declarations
@@ -101,7 +101,7 @@ class CppParse2:
         # Update the root node
         class_def_node = CppParseNode(node_type=CppParseNodeType.CLASS_DEFN,
                                       parent=root_node)
-        class_def_node.add_child_nodes(root_node, i0 + 1, i - 1)
+        class_def_node.add_child_nodes(root_node, i0, i - 1)
         root_node.replace_children(class_def_node, i0, i - 1)
         return i0 + 1
 
@@ -123,8 +123,8 @@ class CppParse2:
                 break
             i += 1
         inherit_node = CppParseNode(node_type=CppParseNodeType.INHERITANCE,
-                                     parent=root_node)
-        inherit_node.add_child_nodes(root_node, i0 + 1, i - 1)
+                                    parent=root_node)
+        inherit_node.add_child_nodes(root_node, i0, i - 1)
         root_node.replace_children(inherit_node, i0, i - 1)
         return i0 + 1
 
@@ -150,7 +150,7 @@ class CppParse2:
         if i >= root_node.size():
             return -1
 
-        # Next node is possilby the namespace body
+        # Next node is possibly the namespace body
         node = root_node[i]
         if node.node_type != CppParseNodeType.BRACES:
             return -1
@@ -161,7 +161,7 @@ class CppParse2:
         # Update the root node
         ns_def_node = CppParseNode(node_type=CppParseNodeType.NAMESPACE_DEFN,
                                    parent=root_node)
-        ns_def_node.add_child_nodes(root_node, i0 + 1, i - 1)
+        ns_def_node.add_child_nodes(root_node, i0, i - 1)
         root_node.replace_children(ns_def_node, i0, i - 1)
         return i0 + 1
 
@@ -170,15 +170,15 @@ class CppParse2:
         Converts:
         ([TEXT] [COLON] [COLON])+
         Into: [TEXT]
+
+        E.g., hello::hi::there
         """
         i0 = i
         ns_node = CppParseNode(node_type=CppParseNodeType.TEXT,
                                parent=root_node)
         while i < root_node.size():
             node = root_node[i]
-            next_node = None
-            if i + 1 < root_node.size():
-                next_node = root_node[i+1]
+            next_node = root_node.next_child(i)
             if node.node_type == CppParseNodeType.TEXT:
                 ns_node.add_child_node(node)
             elif node.node_type == CppParseNodeType.COLON and \
@@ -198,9 +198,7 @@ class CppParse2:
     def _parse_function(self, root_node, i):
         """
         Converts the pattern:
-        [TEXT]+ [PARENS] OR
-        [COMMENT] [TEXT]+ [PARENS]
-
+        [TEXT]+ [PARENS]
         into [FUNCTION]
 
         root_node: the node containing [TEXT]+ [PARENS]
@@ -209,8 +207,6 @@ class CppParse2:
 
         text_count = self._text_iter_reverse(root_node, i - 1)
         i0 = i - text_count
-        if i0 > 0 and root_node[i0 - 1].node_type == CppParseNodeType.COMMENT:
-            i0 -= 1
         i = self._parse_args(root_node, i, CppParseNodeType.PARAMS)
         function_node = CppParseNode(node_type=CppParseNodeType.FUNCTION,
                                      parent=root_node)
@@ -263,8 +259,8 @@ class CppParse2:
         # Create new lambda supernode
         lambda_node = CppParseNode(node_type=CppParseNodeType.LAMBDA,
                                    parent=root_node)
-        lambda_node.add_child_nodes(root_node, i0, i - 1)
-        root_node.replace_children(lambda_node, i0, i - 1)
+        lambda_node.add_child_nodes(root_node, i0, i)
+        root_node.replace_children(lambda_node, i0, i)
         return i0 + 1
 
     def _check_if_template_params(self, root_node, i):
@@ -282,16 +278,18 @@ class CppParse2:
         """
 
         i0 = i
+        style_node = CppParseNode(CppParseNodeType.TEXT)
 
         # Check if first node is "<"
         node = root_node[i]
         if node.node_type != CppParseNodeType.ANGLE_BRACKET_LEFT:
             return -1
+        style_node.add_child_node(node)
         i += 1
 
         # Create template param node
         tparams_node = CppParseNode(node_type=CppParseNodeType.TEMPLATE_PARAMS,
-                                parent=root_node)
+                                    parent=root_node)
         param_node = CppParseNode(
             node_type=CppParseNodeType.PARAM,
             parent=tparams_node
@@ -301,10 +299,13 @@ class CppParse2:
         while i < root_node.size():
             node = root_node[i]
             if node.node_type == CppParseNodeType.ANGLE_BRACKET_RIGHT:
+                style_node.add_child_node(node, hidden=True)
                 tparams_node.add_child_node(param_node)
                 root_node.replace_children(tparams_node, i0, i)
+                self.get_style_nodes().add_child_node(style_node)
                 return i0 + 1
             elif node.node_type == CppParseNodeType.COMMA:
+                style_node.add_child_node(node, hidden=True)
                 tparams_node.add_child_node(param_node)
                 param_node = CppParseNode(
                     node_type=CppParseNodeType.PARAM,
@@ -343,6 +344,7 @@ class CppParse2:
         """
         # Create param node
         i0 = i
+        style_node = CppParseNode(CppParseNodeType.TEXT)
         params_node = CppParseNode(node_type=node_type,
                                     parent=root_node)
         param_node = CppParseNode(
@@ -356,19 +358,19 @@ class CppParse2:
         while i < parens_node.size():
             node = parens_node[i]
             if node.node_type == CppParseNodeType.COMMA:
+                style_node.add_child_node(node, hidden=True)
                 params_node.add_child_node(param_node)
                 param_node = CppParseNode(
                     node_type=CppParseNodeType.PARAM,
                     parent=params_node
                 )
-            elif node.node_type == CppParseNodeType.SEMICOLON:
-                return -1
             else:
                 param_node.add_child_node(node)
             i += 1
         params_node.add_child_node(param_node)
         root_node.replace_children(params_node, i0, i0)
-        return i0 + 1
+        self.get_style_nodes().add_child_node(style_node)
+        return i
 
     def _text_iter(self, root_node, i):
         count = 0
@@ -392,3 +394,6 @@ class CppParse2:
 
     def get_root_node(self):
         return self.parse_tree.get_root_node()
+
+    def get_style_nodes(self):
+        return self.parse_tree.get_style_nodes()
