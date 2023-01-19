@@ -9,12 +9,12 @@ def parse_strings():
 
     parser = CppParse(text=text)
     parser.parse()
-    children = parser.get_root_node().get_children()
-    assert(len(children) == 2)
-    assert(children[0].is_one_of(CppParseNodeType.STRING))
-    assert(children[1].is_one_of(CppParseNodeType.CHAR))
-    assert(children[0].val == '1234')
-    assert(children[1].val == '5')
+    node = parser.get_root_node().get_children()
+    assert(len(node) == 2)
+    assert(node[0].is_one_of(CppParseNodeType.STRING))
+    assert(node[1].is_one_of(CppParseNodeType.CHAR))
+    assert(node[0].val == '1234')
+    assert(node[1].val == '5')
     assert(text == parser.invert())
 
 def parse_comments():
@@ -34,6 +34,29 @@ def parse_comments():
     assert(style_nodes[3].val == ' hello2')
     assert(nodes[0].val == '123')
     assert(text == parser.invert())
+
+def parse_macro():
+    text = """
+    #define HELLO hi
+    
+    int HELLO = 5;
+    """
+
+    parser = CppParse(text=text)
+    parser.parse()
+    parser.print()
+
+def parse_macro_fun():
+    text = """
+    #define HELLO(TYPED_CLASS, TYPED_HEADER) \\
+      TYPED_CLASS<TYPED_HEADER>
+
+    int HELLO = 5;
+    """
+
+    parser = CppParse(text=text)
+    parser.parse()
+    parser.print()
 
 def parse_function_proto():
     text = """
@@ -179,9 +202,12 @@ def parse_templated_class():
     print()
     parser.print()
 
-#parse_strings()
+parse_strings()
 #parse_comments()
-parse_function_proto()
+#parse_macro()
+#parse_macro_fun()
+#parse_macro_fun()
+#parse_function_proto()
 #parse_function_body()
 #parse_lambda()
 #parse_class()

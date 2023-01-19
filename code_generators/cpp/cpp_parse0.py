@@ -1,5 +1,5 @@
 """
-Tokenize C++ text
+Tokenize (lex) C++ text
 """
 
 import re

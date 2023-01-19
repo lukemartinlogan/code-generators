@@ -1,9 +1,9 @@
 # CPP
 
-This sub-package is used to parse a C++ file for class definition, namespace
-declarations, function prototypes, and templates. The parsing is based on a
-simple, nearly-context-free analysis of the C++ files. It does not perform
-any preprocessing or type checking (e.g., macros will not be descended into).
+This package builds an "unmodified" parse tree of a C++ file. This parser is not
+tied to any specific compiler implementation, such as gcc or clang. It is
+intended to be used as a "code generator" phase, before type checking,
+optimization, and such are performed.
 
 ## Usage
 

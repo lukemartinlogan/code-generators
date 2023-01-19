@@ -1,9 +1,5 @@
 """
-Gets the initial structure of a C++ text. Identifies:
-1. Preprocessor macros
-2. Strings/characters
-3. Non-angle Groupings (e.g., braces, brackets, parenthesis)
-4. Some binary/unary operations
+An initial labeling of all tokens. No structural changes.
 """
 
 import re
@@ -11,13 +7,15 @@ from .cpp_parse_node import CppParseNode, CppParseNodeType
 
 
 class CppParse1:
-    def __init__(self, lex=None, ignore_comments=False, ignore_whitespace=False):
+    def __init__(self, lex=None):
         self.lex = lex
         self.root_node = None
         self.style_nodes = None
         self.cur_node = None
-        self.ignore_comments = ignore_comments
-        self.ignore_whitespace = ignore_whitespace
+
+        #CPP operators
+        self.operators = ['+', '-', '*', '/', '<', '>', '=', '?', '%', '@',
+                          '&', '^', '|']
 
         #CPP keywords
         self.cpp0 = ['and', 'and_eq', 'asm', 'atomic_cancel', 'atomic_commit',
@@ -244,7 +242,7 @@ class CppParse1:
         #[TEXT] [TEXT]\[TEXT]...
 
         :param toks:
-        :param i:
+        :param i: index of the '#' operator
         :return:
         """
 
@@ -269,34 +267,35 @@ class CppParse1:
             i += 1
         return i + 1
 
-    def _parse_grouping(self, toks, i, term, node_type):
-        """
-        Group everything between starter and terminator recursively.
-        """
-        style_node = CppParseNode(CppParseNodeType.TEXT)
-        group_node = CppParseNode(node_type)
-
-        old_cur_node = self.cur_node
-        self.cur_node = group_node
-        style_node.make_tok_child(CppParseNodeType.TEXT,
-                                  toks[i], i, hidden=True)
-        i = self._parse_toks(toks, i + 1, term=term)
-        style_node.make_tok_child(CppParseNodeType.TEXT,
-                                  term, i - 1, hidden=True)
-
-        self.cur_node = old_cur_node
-        self.style_nodes.add_child_node(style_node)
-        self.cur_node.add_child_node(group_node)
-        return i
-
     def _parse_parens(self, toks, i):
-        return self._parse_grouping(toks, i, ')', CppParseNodeType.PARENS)
+        if toks[i] == '(':
+            bracket_node = CppParseNode(CppParseNodeType.PAREN_LEFT,
+                                        toks[i], i)
+        else:
+            bracket_node = CppParseNode(CppParseNodeType.PAREN_RIGHT,
+                                        toks[i], i)
+        self.cur_node.add_child_node(bracket_node)
+        return i + 1
 
     def _parse_bracket(self, toks, i):
-        return self._parse_grouping(toks, i, ']', CppParseNodeType.BRACKETS)
+        if toks[i] == '[':
+            bracket_node = CppParseNode(CppParseNodeType.BRACKET_LEFT,
+                                        toks[i], i)
+        else:
+            bracket_node = CppParseNode(CppParseNodeType.BRACKET_RIGHT,
+                                        toks[i], i)
+        self.cur_node.add_child_node(bracket_node)
+        return i + 1
 
     def _parse_brace(self, toks, i):
-        return self._parse_grouping(toks, i, '}', CppParseNodeType.BRACES)
+        if toks[i] == '{':
+            bracket_node = CppParseNode(CppParseNodeType.BRACE_LEFT,
+                                        toks[i], i)
+        else:
+            bracket_node = CppParseNode(CppParseNodeType.BRACE_RIGHT,
+                                        toks[i], i)
+        self.cur_node.add_child_node(bracket_node)
+        return i + 1
 
     def _parse_angle_bracket(self, toks, i):
         if toks[i] == '<':
@@ -318,79 +317,16 @@ class CppParse1:
         return self._parse_single_tok(toks, i, CppParseNodeType.SEMICOLON)
 
     def _is_op(self, toks, i):
-        if toks[i] == '+':
-            return True
-        if toks[i] == '-':
-            return True
-        if toks[i] == '*':
-            return True
-        if toks[i] == '/':
-            return True
-        if toks[i] == '<':
-            return True
-        if toks[i] == '>':
-            return True
-        if toks[i] == '=':
-            return True
-        if toks[i] == '?':
-            return True
-        if toks[i] == '%':
-            return True
-        return False
+        return toks[i] in self.operators
 
     def _parse_op(self, toks, i):
-        # Arithmetic operators
-        if self._toks_match(toks, i, '+', '+'):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '-', '-'):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '+', '='):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '-', '='):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '*', '='):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '/', '='):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '%', '='):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-
-        # Relational operators
-        elif self._toks_match(toks, i, '=', '='):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '!', '='):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '<', '='):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '>', '='):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-
-        # Bitwise operators
-        elif self._toks_match(toks, i, '&', '='):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '|', '='):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '^', '='):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '<', '<'):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '>', '>'):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '<', '<', '='):
-            self.parse_multi_tok(toks, i, 3, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '>', '>', '='):
-            self.parse_multi_tok(toks, i, 3, CppParseNodeType.OP)
-
-        # Logical operators
-        elif self._toks_match(toks, i, '&', '&'):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-        elif self._toks_match(toks, i, '|', '|'):
-            self.parse_multi_tok(toks, i, 2, CppParseNodeType.OP)
-
         return self._parse_single_tok(toks, i, CppParseNodeType.OP)
 
     def _parse_text(self, toks, i):
-        return self._parse_single_tok(toks, i, CppParseNodeType.TEXT)
+        if toks[i].isnumeric():
+            return self._parse_single_tok(toks, i, CppParseNodeType.NUMBER)
+        else:
+            return self._parse_single_tok(toks, i, CppParseNodeType.TEXT)
 
     def _is_keyword(self, tok):
         return tok in self.keywords
@@ -405,6 +341,10 @@ class CppParse1:
             self._parse_single_tok(toks, i, CppParseNodeType.NAMESPACE_KEYWORD)
         elif tok == 'template':
             self._parse_single_tok(toks, i, CppParseNodeType.TEMPLATE_KEYWORD)
+        elif tok == 'typedef':
+            self._parse_single_tok(toks, i, CppParseNodeType.TEMPLATE_KEYWORD)
+        elif tok == 'using':
+            self._parse_single_tok(toks, i, CppParseNodeType.USING_KEYWORD)
         elif tok in self.type_keywords:
             self._parse_single_tok(toks, i,
                                    CppParseNodeType.TYPE)
@@ -429,6 +369,12 @@ class CppParse1:
 
     def get_style_nodes(self):
         return self.style_nodes
+
+    def add_error(self, root_node, msg):
+        pass
+
+    def get_errors(self):
+        pass
 
     def _toks_match(self, toks, i, *vals):
         for val in vals:

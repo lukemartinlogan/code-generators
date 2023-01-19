@@ -2,42 +2,62 @@ from enum import Enum
 
 
 class CppParseNodeType(Enum):
-    # Phase 1 parsing
+    # Phase 1 parsing (labeling)
     ROOT = "ROOT"
     STRING = "STRING"
     CHAR = "CHAR"
     TEXT = "TEXT"
+    NUMBER = "NUMBER"
     SL_COMMENT = "SL_COMMENT"
     ML_COMMENT = "ML_COMMENT"
-    BRACKETS = "BRACKETS"
-    PARENS = "PARENS"
-    BRACES = "BRACES"
+    BRACKET_LEFT = "BRACKET_LEFT"
+    BRACKET_RIGHT = "BRACKET_RIGHT"
+    PAREN_LEFT = "PAREN_LEFT"
+    PAREN_RIGHT = "PAREN_RIGHT"
+    BRACE_LEFT = "BRACE_LEFT"
+    BRACE_RIGHT = "BRACE_RIGHT"
+    ANGLE_BRACKET_LEFT = "ANGLE_BRACKET_LEFT"
+    ANGLE_BRACKET_RIGHT = "ANGLE_BRACKET_RIGHT"
     PREPROCESSOR = "PREPROCESSOR"
-
-    # Phase 1 parsing
     CLASS_KEYWORD = 'CLASS_KEYWORD'
     STRUCT_KEYWORD = 'STRUCT_KEYWORD'
     NAMESPACE_KEYWORD = 'NAMESPACE_KEYWORD'
     TEMPLATE_KEYWORD = 'TEMPLATE_KEYWORD'
+    TYPEDEF_KEYWORD = 'TYPEDEF_KEYWORD'
+    USING_KEYWORD = 'USING_KEYWORD'
     TYPE = "TYPE"
     KEYWORD = "KEYWORD"
-
-    # Phase 1 parsing
     OP = "OP"
-    ANGLE_BRACKET_LEFT = "ANGLE_BRACKET_LEFT"
-    ANGLE_BRACKET_RIGHT = "ANGLE_BRACKET_RIGHT"
     COMMA = "COMMA"
     COLON = "COLON"
     SEMICOLON = "SEMICOLON"
 
-    # Phase 2 parsing
-    FUNCTION = "FUNCTION"
-    LAMBDA = "LAMBDA"
+    # Phase 2 parsing (basic structuring)
+    PARENTHESIS = "PARENTHISIS"
+    BRACKETS = "BRACKETS"
+    BRACES = "BRACES"
+
+    # Phase 3 parsing (preprocessing)
+    MACRO_DEF = "MACRO_DEF"
+    MACRO_BODY = "MACRO_BODY"
+    MACRO_FUNC_DEF = "MACRO_FUNC_DEF"
+    MACRO_INCLUDE = "MACRO_INCLUDE"
+    MACRO_CALL = "MACRO_CALL"
+    PRAGMA = "PRAGMA"
+    MACRO_IF = "MACRO_IF"
+    MACRO_IFDEF = "MACRO_IF"
+    MACRO_IFNDEF = "MACRO_IF"
+
+    # Phase 4 parsing (type/class/namespace declarations)
     CLASS_DEFN = "CLASS_DEFN"
     INHERITANCE = "INHERITANCE"
     NAMESPACE_DEFN = "NAMESPACE_DEFN"
     TEMPLATE_PARAMS = "TEMPLATE_PARAMS"
-    TEMPLATE = "TEMPLATE"
+    TEMPLATE_DEFN = "TEMPLATE_DEFN"
+
+    # Phase 5 parsing (function/lambda definitions)
+    FUNCTION = "FUNCTION"
+    LAMBDA = "LAMBDA"
     LAMBDA_CAPTURE_PARAMS = "LAMBDA_CAPTURE_PARAMS"
     PARAMS = "PARAMS"
     PARAM = "PARAM"
@@ -121,7 +141,7 @@ class CppParseNode:
             i -= 1
         return None
 
-    def join(self, ignore_hidden=True, inplace=True, style_nodes=None):
+    def join(self, ignore_hidden=True, inplace=True, destroy_children=False):
         """
         Merge all child nodes as the value of this node
 
@@ -139,6 +159,9 @@ class CppParseNode:
                            for x in self.children_])
         if inplace:
             self.val = val
+        if destroy_children and len(self.children_):
+            self.start = self.children_[0].start
+            self.children_ = []
         return val
 
     def linearize(self, nodelist=None):
