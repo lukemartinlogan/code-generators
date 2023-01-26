@@ -108,7 +108,6 @@ class CppParse3:
         :return:
         """
         macro_node = self.macros[root_node[i].val]
-        macro_body =
         root_node.replace_children()
 
     def _parse_function_macro(self, root_node, i):
